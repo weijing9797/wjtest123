@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+  namespace: wj-test
+  annotations:
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-zone-maps: ap-southeast-1a:vsw-t4ng0rw5fne9n95b5jd27,ap-southeast-1b:vsw-t4n0k24cpukvn59ppwqfg,ap-southeast-1c:vsw-t4nxycoy472badyfvr3dk
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: "internet"
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-protocol-port: "TCP:80"  
+spec:
+  loadBalancerClass: "alibabacloud.com/nlb"
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    name: nginx
