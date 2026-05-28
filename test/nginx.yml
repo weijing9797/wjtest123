@@ -1,12 +1,126 @@
-apiVersion: apps/v1
-kind: Deployment
+---
+# ==============================================================================
+# Complete nginx canary with automated analysis (auto-rollback)
+# Namespace: wj-test (assumed to already exist)
+#
+# Contains:
+#   1. ConfigMap nginx-content-v1   ("hello world", blue)
+#   2. ConfigMap nginx-content-v2   ("hello world 2!!", red)
+#   3. AnalysisTemplate             (HTTP 200 check, runs during canary)
+#   4. Rollout                      (canary with analysis hook)
+#   5. Service                      (LoadBalancer)
+#
+# Prereqs:
+#   kubectl create namespace argo-rollouts
+#   kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+#
+# Apply:
+#   kubectl apply -f nginx-canary-with-analysis.yaml
+#
+# Trigger canary: change `nginx-content-v1` to `nginx-content-v2` in the
+# Rollout's volumes section near the bottom, then re-apply (or git push).
+# ==============================================================================
+---
+# ==============================================================================
+# ConfigMap v1 — "hello world"
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-content-v1
+  namespace: wj-test
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Hello</title>
+      <style>
+        body {
+          font-family: -apple-system, sans-serif;
+          text-align: center;
+          padding-top: 100px;
+          background: #f0f9ff;
+        }
+        h1 { color: #2563eb; font-size: 4em; }
+        p { color: #64748b; font-size: 1.2em; }
+      </style>
+    </head>
+    <body>
+      <h1>hello world</h1>
+      <p>version: v1</p>
+    </body>
+    </html>
+---
+# ==============================================================================
+# ConfigMap v2 — "hello world 2!!"
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-content-v2
+  namespace: wj-test
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Hello</title>
+      <style>
+        body {
+          font-family: -apple-system, sans-serif;
+          text-align: center;
+          padding-top: 100px;
+          background: #fef2f2;
+        }
+        h1 { color: #dc2626; font-size: 4em; }
+        p { color: #64748b; font-size: 1.2em; }
+      </style>
+    </head>
+    <body>
+      <h1>hello world 2!!</h1>
+      <p>version: v2</p>
+    </body>
+    </html>
+---
+# ==============================================================================
+# AnalysisTemplate — defines "is the canary healthy?"
+#
+# Uses the built-in `web` provider, which just curls a URL.
+# - Checks every 10 seconds
+# - Looks for HTTP 200
+# - Aborts rollout after 2 consecutive failures
+# No Prometheus required.
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: nginx-http-check
+  namespace: wj-test
+spec:
+  metrics:
+    - name: http-status-check
+      interval: 10s        # run this check every 10s
+      count: 5             # collect up to 5 measurements
+      failureLimit: 2      # abort after 2 failed checks
+      successCondition: "result == 200"
+      provider:
+        web:
+          url: http://nginx.wj-test.svc.cluster.local/
+---
+# ==============================================================================
+# Rollout — nginx with canary + background analysis
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: nginx
   namespace: wj-test
   labels:
     app: nginx
 spec:
-  replicas: 1
+  replicas: 5            # 5 pods makes the 20% canary ratio visually obvious
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: nginx
@@ -22,6 +136,21 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+          volumeMounts:
+            - name: content
+              mountPath: /usr/share/nginx/html
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
           resources:
             requests:
               cpu: 50m
@@ -29,21 +158,31 @@ spec:
             limits:
               cpu: 200m
               memory: 128Mi
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 3
-            periodSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: false  # nginx official image runs as root for port 80
-            capabilities:
-              drop: ["ALL"]
-              add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE"]
+      volumes:
+        - name: content
+          configMap:
+            # ----------------------------------------------------------------
+            # CHANGE THIS to `nginx-content-v2` to trigger the canary rollout
+            # ----------------------------------------------------------------
+            name: nginx-content-v1
+  strategy:
+    canary:
+      maxSurge: "25%"
+      maxUnavailable: 0
+
+      # ---------- Background analysis ----------
+      # Runs the AnalysisTemplate above continuously during the canary.
+      # If it fails (HTTP not 200 twice in a row), the rollout auto-aborts.
+      analysis:
+        templates:
+          - templateName: nginx-http-check
+        startingStep: 1   # start analysis right after the first setWeight
+
+      steps:
+        - setWeight: 20
+        - pause: { duration: 60s }
+        - setWeight: 50
+        - pause: { duration: 60s }
+        - setWeight: 80
+        - pause: { duration: 60s }
+        # implicit 100% promotion after final step
