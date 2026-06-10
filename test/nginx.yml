@@ -119,6 +119,13 @@ metadata:
   name: nginx-cpu-check
   namespace: wj-test
 spec:
+  args:
+    # 从 Secret 读取，不暴露在 yaml 里
+    - name: alibaba-auth
+      valueFrom:
+        secretKeyRef:
+          name: alibaba-prometheus-auth
+          key: authorization
   metrics:
     - name: canary-cpu-usage
       interval: 30s
@@ -132,10 +139,7 @@ spec:
           address: https://workspace-default-cms-5650152734106690-ap-southeast-1.ap-southeast-1.log.aliyuncs.com/prometheus/workspace-default-cms-5650152734106690-ap-southeast-1/aliyun-prom-c6d340b47d7f9444889df2578c019e705
           headers:
             - key: Authorization
-              value:
-                secretKeyRef:
-                  name: alibaba-prometheus-auth
-                  key: auth  
+              value: "{{args.alibaba-auth}}"   # ← string 模板，不是 object
           query: |
             sum(rate(container_cpu_usage_seconds_total{
               namespace="wj-test",
