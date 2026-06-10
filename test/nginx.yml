@@ -116,18 +116,35 @@ data:
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
-  name: nginx-http-check
+  name: nginx-cpu-check
   namespace: wj-test
 spec:
   metrics:
-    - name: http-status-check
-      interval: 10s        # run this check every 10s
-      count: 5             # collect up to 5 measurements
-      failureLimit: 2      # abort after 2 failed checks
-      successCondition: "result == 200"
+    - name: canary-cpu-usage
+      interval: 30s
+      count: 3
+      failureLimit: 1
+      # 当前 CPU 约 0.19~0.21，设 0.8 宽松一点方便测试通过
+      successCondition: "result < 0.001"
+      failureCondition: "result >= 0.001"
       provider:
-        web:
-          url: http://nginx-svc.wj-test.svc.cluster.local/
+        prometheus:
+          address: https://workspace-default-cms-5650152734106690-ap-southeast-1.ap-southeast-1.log.aliyuncs.com/prometheus/workspace-default-cms-5650152734106690-ap-southeast-1/aliyun-prom-c6d340b47d7f9444889df2578c019e705
+          authentication:
+            basic:
+              username:
+                secretKeyRef:
+                  name: alibaba-prometheus-auth
+                  key: username
+              password:
+                secretKeyRef:
+                  name: alibaba-prometheus-auth
+                  key: password
+          query: |
+            sum(rate(container_cpu_usage_seconds_total{
+              namespace="wj-test",
+              container="nginx"
+            }[1m]))
 ---
 # ==============================================================================
 # Rollout — nginx with canary + background analysis
