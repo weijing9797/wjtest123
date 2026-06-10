@@ -106,7 +106,7 @@ spec:
       successCondition: "result == 200"
       provider:
         web:
-          url: http://nginx.wj-test.svc.cluster.local/
+          url: http://nginx-svc.wj-test.svc.cluster.local/
 ---
 # ==============================================================================
 # Rollout — nginx with canary + background analysis
