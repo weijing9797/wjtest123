@@ -27,6 +27,7 @@ metadata:
   name: nginx-canary-route
   namespace: wj-test
 spec:
+  ingressClassName: apisix 
   http:
     - name: canary-split
       match:
