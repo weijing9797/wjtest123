@@ -130,16 +130,12 @@ spec:
       provider:
         prometheus:
           address: https://workspace-default-cms-5650152734106690-ap-southeast-1.ap-southeast-1.log.aliyuncs.com/prometheus/workspace-default-cms-5650152734106690-ap-southeast-1/aliyun-prom-c6d340b47d7f9444889df2578c019e705
-          authentication:
-            basic:
-              username:
+          headers:
+            - key: Authorization
+              value:
                 secretKeyRef:
                   name: alibaba-prometheus-auth
-                  key: username
-              password:
-                secretKeyRef:
-                  name: alibaba-prometheus-auth
-                  key: password
+                  key: auth  
           query: |
             sum(rate(container_cpu_usage_seconds_total{
               namespace="wj-test",
