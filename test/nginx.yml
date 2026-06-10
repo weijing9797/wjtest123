@@ -37,10 +37,9 @@ spec:
       backends:
         - serviceName: nginx-svc
           servicePort: 80
-          weight: 80          # 80% 流量到 stable
         - serviceName: nginx-canary-svc
           servicePort: 80
-          weight: 20          # 20% 流量到 canary
+
 ---
 # ==============================================================================
 # ConfigMap v1 — "hello world"
@@ -193,11 +192,11 @@ spec:
       maxSurge: "25%"
       maxUnavailable: 0
       trafficRouting:
-        plugins:
-          - name: apisix
-            config:
-              route: nginx-canary-route
-              namespace: wj-test
+        apisix:
+          route: 
+            name: nginx-canary-route
+            rules:
+              - canary-split
       # ---------- Background analysis ----------
       # Runs the AnalysisTemplate above continuously during the canary.
       # If it fails (HTTP not 200 twice in a row), the rollout auto-aborts.
