@@ -220,7 +220,7 @@ spec:
       # If it fails (HTTP not 200 twice in a row), the rollout auto-aborts.
       analysis:
         templates:
-          - templateName: nginx-http-check
+          - templateName: nginx-cpu-check
         startingStep: 1   # start analysis right after the first setWeight
       steps:
         - setWeight: 20
