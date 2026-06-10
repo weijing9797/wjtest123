@@ -140,6 +140,7 @@ spec:
           headers:
             - key: Authorization
               value: "{{args.alibaba-auth}}"   # ← string 模板，不是 object
+          jsonPath: "{$.data.result[0].value[1]}"
           query: |
             sum(rate(container_cpu_usage_seconds_total{
               namespace="wj-test",
