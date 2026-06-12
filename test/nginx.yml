@@ -126,26 +126,24 @@ spec:
         secretKeyRef:
           name: alibaba-prometheus-auth
           key: authorization
-  metrics:
-    - name: canary-cpu-usage
-      interval: 30s
-      count: 3
-      failureLimit: 1
-      # 当前 CPU 约 0.19~0.21，设 0.8 宽松一点方便测试通过
-      successCondition: "result < 0.001"
-      failureCondition: "result >= 0.001"
-      provider:
-        prometheus:
-          address: https://workspace-default-cms-5650152734106690-ap-southeast-1.ap-southeast-1.log.aliyuncs.com/prometheus/workspace-default-cms-5650152734106690-ap-southeast-1/aliyun-prom-c6d340b47d7f9444889df2578c019e705
-          headers:
-            - key: Authorization
-              value: "{{args.alibaba-auth}}"   # ← string 模板，不是 object
-          jsonPath: "{$.data.result[0].value[1]}"
-          query: |
-            sum(rate(container_cpu_usage_seconds_total{
-              namespace="wj-test",
-              container="nginx"
-            }[1m]))
+metrics:
+  - name: canary-cpu-usage
+    interval: 30s
+    count: 3
+    failureLimit: 1
+    successCondition: "result[0] < 0.001"
+    failureCondition: "result[0] >= 0.001"
+    provider:
+      prometheus:
+        address: https://workspace-default-cms-5650152734106690-ap-southeast-1.ap-southeast-1.log.aliyuncs.com/prometheus/workspace-default-cms-5650152734106690-ap-southeast-1/aliyun-prom-c6d340b47d7f9444889df2578c019e705
+        headers:
+          - key: Authorization
+            value: "{{args.alibaba-auth}}"
+        query: |
+          sum(rate(container_cpu_usage_seconds_total{
+            namespace="wj-test",
+            container="nginx"
+          }[1m]))
 ---
 # ==============================================================================
 # Rollout — nginx with canary + background analysis
@@ -203,7 +201,7 @@ spec:
             # ----------------------------------------------------------------
             # CHANGE THIS to `nginx-content-v2` to trigger the canary rollout
             # ----------------------------------------------------------------
-            name: nginx-content-v2
+            name: nginx-content-v1
   strategy:
     canary:
       stableService: nginx-svc
