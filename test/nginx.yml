@@ -200,7 +200,7 @@ spec:
             # ----------------------------------------------------------------
             # CHANGE THIS to `nginx-content-v2` to trigger the canary rollout
             # ----------------------------------------------------------------
-            name: nginx-content-v2
+            name: nginx-content-v1
   strategy:
     canary:
       stableService: nginx-svc
